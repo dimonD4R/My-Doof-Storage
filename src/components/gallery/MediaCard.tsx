@@ -2,6 +2,7 @@ import { memo, useEffect, useRef, useState } from "react";
 import type { MediaItem } from "../../types";
 import { useApp } from "../../state/AppStore";
 import { mediaUrl, mediaUrls, thumbUrl } from "../../data/mediaUrlResolver";
+import { startDownload } from "../../lib/downloads";
 import { formatDateShort } from "../../utils/date";
 import { IconDownload, IconFilm, IconHeart, IconHeartFill, IconPhoto, IconPlay, IconPlus } from "../ui/icons";
 import { cn } from "../../utils/cn";
@@ -166,13 +167,7 @@ const MediaCardInner = memo(function MediaCard({
                   label="Download"
                   onClick={(e) => {
                     e.stopPropagation();
-                    const a = document.createElement("a");
-                    a.href = url.download;
-                    a.download = url.fileName;
-                    a.target = "_blank";
-                    a.rel = "noreferrer";
-                    a.click();
-                    toast(`Downloading ${url.fileName}`, "neutral");
+                    void startDownload(media.hasVideo ? url.video : url.image, url.fileName).catch(() => toast(`Couldn't download ${url.fileName}`, "error"));
                   }}
                 >
                   <IconDownload width={15} height={15} />

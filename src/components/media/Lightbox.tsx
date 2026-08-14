@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import type { MediaItem } from "../../types";
 import { useApp } from "../../state/AppStore";
 import { mediaUrls } from "../../data/mediaUrlResolver";
+import { startDownload } from "../../lib/downloads";
 import { formatDate, formatTime } from "../../utils/date";
 import { AddToCollectionDialog } from "../collections/AddToCollectionDialog";
 import { ShareModal } from "../sharing/ShareModal";
@@ -72,13 +73,8 @@ function LightboxInner() {
       else if (e.key === "ArrowLeft") lightboxPrev();
       else if (e.key === "ArrowRight") lightboxNext();
       else if (e.key.toLowerCase() === "d") {
-        if (url) {
-          const a = document.createElement("a");
-          a.href = url.download;
-          a.download = url.fileName;
-          a.target = "_blank";
-          a.rel = "noreferrer";
-          a.click();
+        if (url && media) {
+          void startDownload(media.hasVideo ? url.video : url.image, url.fileName).catch(() => toast(`Couldn't download ${url.fileName}`, "error"));
         }
       } else if (e.key === " ") {
         e.preventDefault();
@@ -122,14 +118,8 @@ function LightboxInner() {
   };
 
   const onDownload = () => {
-    if (!url) return;
-    const a = document.createElement("a");
-    a.href = url.download;
-    a.download = url.fileName;
-    a.target = "_blank";
-    a.rel = "noreferrer";
-    a.click();
-    toast(`Downloading ${url.fileName}`, "neutral");
+    if (!url || !media) return;
+    void startDownload(media.hasVideo ? url.video : url.image, url.fileName).catch(() => toast(`Couldn't download ${url.fileName}`, "error"));
   };
 
   const swipeX = useRef(0);

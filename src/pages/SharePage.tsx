@@ -7,6 +7,7 @@ import { useApp } from "../state/AppStore";
 import { decodePayloadIds, decodeToken, sha256Hex } from "../lib/sharing";
 import { applyFilters } from "../lib/filtering";
 import { mediaUrl, mediaUrls } from "../data/mediaUrlResolver";
+import { startDownload } from "../lib/downloads";
 import { DownloadDialog } from "../components/downloads/DownloadDialog";
 import { plural } from "../utils/date";
 import { formatDuration } from "../components/gallery/MediaCard";
@@ -213,6 +214,19 @@ export function SharePage() {
                 aria-label="Search shared memories"
                 className="h-9.5 w-full bg-transparent text-sm text-ink placeholder:text-ink-3 focus:outline-none"
               />
+              {search && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    setSearch("");
+                    setSearchOpen(false);
+                  }}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-card-2 hover:text-ink"
+                >
+                  <IconX width={14} height={14} />
+                </button>
+              )}
             </div>
 
             {searchOpen && suggestions.length > 0 && (
@@ -545,11 +559,8 @@ function ShareTile({
             aria-hidden="true"
             onClick={(e) => {
               e.stopPropagation();
-              const a = document.createElement("a");
-              a.href = media.hasVideo ? configUrl(media.videoPath) : configUrl(media.imagePath);
-              a.download = media.fileName;
-              a.rel = "noreferrer";
-              a.click();
+              const src = media.hasVideo ? configUrl(media.videoPath) : configUrl(media.imagePath);
+              void startDownload(src, media.fileName).catch(() => undefined);
             }}
             className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition-opacity group-hover:opacity-100"
           >
@@ -596,11 +607,7 @@ function ShareViewer({
       else if (e.key === "ArrowLeft") prev();
       else if (e.key === "ArrowRight") next();
       else if (e.key.toLowerCase() === "d" && canDownload && url) {
-        const a = document.createElement("a");
-        a.href = url.download;
-        a.download = url.fileName;
-        a.rel = "noreferrer";
-        a.click();
+        void startDownload(media.hasVideo ? url.video : url.image, url.fileName).catch(() => undefined);
       } else if (e.key === " " && media?.hasVideo) {
         e.preventDefault();
         const v = document.querySelector("[data-share-video]") as HTMLVideoElement | null;
@@ -646,11 +653,7 @@ function ShareViewer({
         <div className="flex-1" />
         {canDownload && url && (
           <button aria-label="Download" onClick={() => {
-            const a = document.createElement("a");
-            a.href = url.download;
-            a.download = url.fileName;
-            a.rel = "noreferrer";
-            a.click();
+            void startDownload(media.hasVideo ? url.video : url.image, url.fileName).catch(() => undefined);
           }} className="flex h-9.5 w-9.5 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white">
             <IconDownload width={18} height={18} />
           </button>

@@ -14,6 +14,8 @@ import { FavoritesPage } from "./pages/FavoritesPage";
 import { CategoriesPage } from "./pages/CategoriesPage";
 import { PeoplePage } from "./pages/PeoplePage";
 import { SharePage } from "./pages/SharePage";
+import { SiteGate } from "./components/navigation/SiteGate";
+import { DownloadProgress } from "./components/downloads/DownloadProgress";
 
 /**
  * Routing is hash-based (`#/route`) so share links like
@@ -24,23 +26,26 @@ export function App() {
   return (
     <AppStoreProvider>
       <HashRouter>
-        <Routes>
-          <Route path="/share/:token" element={<SharePage />} />
-          <Route element={<Layout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/memories" element={<MemoriesPage />} />
-            <Route path="/events" element={<EventsPage />} />
-            <Route path="/events/:id" element={<EventDetailPage />} />
-            <Route path="/timeline" element={<TimelinePage />} />
-            <Route path="/collections" element={<CollectionsPage />} />
-            <Route path="/collections/:id" element={<CollectionDetailPage />} />
-            <Route path="/favorites" element={<FavoritesPage />} />
-            <Route path="/categories" element={<CategoriesPage />} />
-            <Route path="/people" element={<PeoplePage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
+        <SiteGate>
+          <Routes>
+            <Route path="/share/:token" element={<SharePage />} />
+            <Route element={<Layout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/memories" element={<MemoriesPage />} />
+              <Route path="/events" element={<EventsPage />} />
+              <Route path="/events/:id" element={<EventDetailPage />} />
+              <Route path="/timeline" element={<TimelinePage />} />
+              <Route path="/collections" element={<CollectionsPage />} />
+              <Route path="/collections/:id" element={<CollectionDetailPage />} />
+              <Route path="/favorites" element={<FavoritesPage />} />
+              <Route path="/categories" element={<CategoriesPage />} />
+              <Route path="/people" element={<PeoplePage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </SiteGate>
         <Lightbox />
+        <DownloadProgress />
         <ToasterHost />
       </HashRouter>
     </AppStoreProvider>

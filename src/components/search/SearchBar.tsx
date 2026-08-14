@@ -8,7 +8,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../../state/AppStore";
 import { suggest, type SearchSuggestion } from "../../lib/search";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import { IconPhoto, IconSearch, IconStar, IconTags, IconUsers } from "../ui/icons";
+import { IconPhoto, IconSearch, IconStar, IconTags, IconUsers, IconX } from "../ui/icons";
 import { cn } from "../../utils/cn";
 
 /** Pages that filter their own content by the `search` URL param. */
@@ -75,6 +75,22 @@ export function SearchBar({
 
   const suggestions = open && debounced.trim() ? suggest(archive, debounced) : [];
 
+  const activeSearch =
+    new URLSearchParams(location.search).get("search") ?? "";
+  const showClear = !!query || !!activeSearch;
+
+  const clear = () => {
+    setQuery("");
+    setOpen(false);
+    inputRef.current?.focus();
+    const params = new URLSearchParams(location.search);
+    if (params.has("search")) {
+      params.delete("search");
+      const qs = params.toString();
+      navigate(`${location.pathname}${qs ? `?${qs}` : ""}`, { replace: true });
+    }
+  };
+
   const go = (q: string) => {
     const trimmed = q.trim();
     setOpen(false);
@@ -123,6 +139,16 @@ export function SearchBar({
             aria-label="Search memories"
             className="w-full bg-transparent text-sm text-ink placeholder:text-ink-3 focus:outline-none"
           />
+          {showClear && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={clear}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-card-2 hover:text-ink"
+            >
+              <IconX width={14} height={14} />
+            </button>
+          )}
           <kbd className="hidden shrink-0 rounded-md border border-line bg-card-2 px-1.5 py-0.5 text-[10px] font-medium text-ink-3 sm:inline-block">
             ⌘K
           </kbd>

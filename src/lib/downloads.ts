@@ -62,6 +62,58 @@ export function triggerBlobDownload(blob: Blob, fileName: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
+// ---------------------------------------------------------------------------
+// Global single-file download progress
+// ---------------------------------------------------------------------------
+
+export interface DownloadProgressState {
+  active: boolean;
+  fileName: string;
+  percent: number;
+}
+
+type DownloadProgressListener = (s: DownloadProgressState) => void;
+
+const downloadListeners = new Set<DownloadProgressListener>();
+let downloadState: DownloadProgressState = { active: false, fileName: "", percent: 0 };
+
+function publishDownloadState() {
+  downloadListeners.forEach((l) => l(downloadState));
+}
+
+export function subscribeDownloads(listener: DownloadProgressListener): () => void {
+  downloadListeners.add(listener);
+  listener(downloadState);
+  return () => downloadListeners.delete(listener);
+}
+
+/**
+ * Downloads a single file through a CORS-enabled fetch so we can report real
+ * byte progress in-app, then hands the blob to the browser's native download.
+ * Every quick per-file download button uses this so users always see progress.
+ */
+export async function startDownload(url: string, fileName: string): Promise<void> {
+  downloadState = { active: true, fileName, percent: 0 };
+  publishDownloadState();
+  try {
+    const blob = await fetchBlob(url, (received, total) => {
+      downloadState = { active: true, fileName, percent: Math.round((received / total) * 100) };
+      publishDownloadState();
+    });
+    triggerBlobDownload(blob, fileName);
+    downloadState = { active: true, fileName, percent: 100 };
+    publishDownloadState();
+    setTimeout(() => {
+      downloadState = { active: false, fileName: "", percent: 0 };
+      publishDownloadState();
+    }, 1400);
+  } catch (err) {
+    downloadState = { active: false, fileName: "", percent: 0 };
+    publishDownloadState();
+    throw err;
+  }
+}
+
 /**
  * Downloads several media files, bundled into a ZIP.
  * Falls back to sequential individual downloads when blob fetch is unavailable.
