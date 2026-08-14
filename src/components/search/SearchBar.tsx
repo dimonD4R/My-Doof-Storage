@@ -11,6 +11,9 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { IconPhoto, IconSearch, IconStar, IconTags, IconUsers } from "../ui/icons";
 import { cn } from "../../utils/cn";
 
+/** Pages that filter their own content by the `search` URL param. */
+const SEARCHABLE_PAGES = new Set(["/memories", "/categories"]);
+
 function suggestionIcon(type: SearchSuggestion["type"]) {
   switch (type) {
     case "category": return <IconTags width={14} height={14} />;
@@ -78,10 +81,13 @@ export function SearchBar({
     if (!trimmed) return;
     onNavigate?.();
     // Preserve any active URL filters (e.g. a category, event, collection) so a
-    // search stays scoped to the current view instead of resetting it.
+    // search stays scoped to the current view instead of resetting it. Also stay
+    // on the current page when it supports search (e.g. Categories) rather than
+    // always jumping to Memories.
     const params = new URLSearchParams(location.search);
     params.set("search", trimmed);
-    navigate(`/memories?${params.toString()}`);
+    const target = SEARCHABLE_PAGES.has(location.pathname) ? location.pathname : "/memories";
+    navigate(`${target}?${params.toString()}`);
   };
 
   const onSubmit = (e: FormEvent) => {
