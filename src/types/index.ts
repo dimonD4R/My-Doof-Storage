@@ -114,7 +114,7 @@ export interface ShareLink {
   id: string;
   token: string;
   displayName: string;
-  kind: "collection" | "event";
+  kind: "collection" | "event" | "category";
   targetId: string;
   permissions: SharePermissions;
   createdAt: number;
@@ -124,7 +124,7 @@ export interface ShareLink {
 
 export interface SharePayload {
   v: 1;
-  kind: "collection" | "event";
+  kind: "collection" | "event" | "category";
   targetId: string;
   name: string;
   description: string;

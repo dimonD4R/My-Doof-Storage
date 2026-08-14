@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import type { MediaItem } from "../types";
+import { EMPTY_FILTERS } from "../types";
 import { useApp } from "../state/AppStore";
 import { decodePayloadIds, decodeToken, sha256Hex } from "../lib/sharing";
+import { applyFilters } from "../lib/filtering";
 import { mediaUrl, mediaUrls } from "../data/mediaUrlResolver";
 import { DownloadDialog } from "../components/downloads/DownloadDialog";
 import { plural } from "../utils/date";
@@ -18,7 +20,11 @@ import {
   IconPause,
   IconPhoto,
   IconPlay,
+  IconSearch,
   IconSparkles,
+  IconStar,
+  IconTags,
+  IconUsers,
   IconX,
 } from "../components/ui/icons";
 
@@ -51,6 +57,8 @@ export function SharePage() {
   const [unlocked, setUnlocked] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [dlOpen, setDlOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Dynamic Open Graph / social metadata for link previews (WhatsApp, Telegram…).
   useEffect(() => {
@@ -94,6 +102,17 @@ export function SharePage() {
     );
   }, [allAllowed, payload]);
 
+  const filtered = useMemo<MediaItem[]>(() => {
+    if (!search.trim()) return visible;
+    return applyFilters(
+      visible,
+      { ...EMPTY_FILTERS, search },
+      { favorites: new Set(), collections: [] }
+    );
+  }, [visible, search]);
+
+  const suggestions = useMemo(() => suggestShared(visible, search), [visible, search]);
+
   if (status === "invalid") {
     return <MessagePage title="This share link is invalid" message="It may be a broken or copied link. Ask the owner to share a fresh link." />;
   }
@@ -104,6 +123,7 @@ export function SharePage() {
     return (
       <PasswordGate
         name={payload!.name}
+        kind={payload!.kind}
         expected={payload!.passwordHash!}
         onUnlock={() => setUnlocked(true)}
       />
@@ -125,9 +145,9 @@ export function SharePage() {
     );
   }
 
-  const photos = visible.filter((m) => m.hasImage).length;
-  const videos = visible.filter((m) => m.hasVideo).length;
-  const cover = visible.find((m) => m.hasImage) ?? visible[0];
+  const photos = filtered.filter((m) => m.hasImage).length;
+  const videos = filtered.filter((m) => m.hasVideo).length;
+  const cover = filtered.find((m) => m.hasImage) ?? filtered[0];
   const config = archive.repository;
 
   const openViewer = (i: number) => setViewerIndex(i);
@@ -174,7 +194,49 @@ export function SharePage() {
           </p>
           <p className="mt-2 text-[12.5px] text-ink-3">
             {plural(photos, "photo")} · {plural(videos, "video")}
+            {search.trim() ? ` · ${plural(filtered.length, "result")} for “${search.trim()}”` : ""}
           </p>
+
+          {/* Search within the shared media */}
+          <div className="relative mt-5 max-w-sm">
+            <div className="flex items-center gap-2.5 rounded-full border border-line bg-card px-3.5 transition-colors focus-within:border-ink-3">
+              <IconSearch width={15} height={15} className="shrink-0 text-ink-3" />
+              <input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                onBlur={() => setSearchOpen(false)}
+                placeholder={`Search ${plural(allAllowed.length, "memory")}...`}
+                aria-label="Search shared memories"
+                className="h-9.5 w-full bg-transparent text-sm text-ink placeholder:text-ink-3 focus:outline-none"
+              />
+            </div>
+
+            {searchOpen && suggestions.length > 0 && (
+              <ul className="absolute z-50 mt-2 w-full overflow-hidden rounded-2xl border border-line bg-card py-1.5 shadow-float anim-pop-in">
+                {suggestions.map((s, i) => (
+                  <li key={`${s.type}-${s.label}-${i}`}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setSearch(s.label);
+                        setSearchOpen(false);
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-[13px] hover:bg-card-2"
+                    >
+                      <span className="text-ink-3">{suggestionIcon(s.type)}</span>
+                      <span className="flex-1 truncate font-medium text-ink">{s.label}</span>
+                      {s.hint && <span className="text-[11px] text-ink-3">{s.hint}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           {visible.length > 0 && canDownload && (
             <button
@@ -186,18 +248,21 @@ export function SharePage() {
           )}
         </div>
 
-        {visible.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line-strong bg-card/50 px-6 py-16 text-center">
-            <span className="text-ink-3"><IconPhoto width={30} height={30} /></span>
-            <h3 className="text-[15px] font-semibold text-ink">Nothing to show</h3>
+            <span className="text-ink-3"><IconSearch width={30} height={30} /></span>
+            <h3 className="text-[15px] font-semibold text-ink">
+              {search.trim() ? "No matching memories" : "Nothing to show"}
+            </h3>
             <p className="max-w-sm text-[13px] leading-relaxed text-ink-2">
-              The owner chose not to share any {!payload?.permissions.viewPhotos ? "photos" : ""}{" "}
-              {!payload?.permissions.viewVideos ? "videos" : ""} in this link.
+              {search.trim()
+                ? `Nothing in this share matches “${search.trim()}”. Try another search.`
+                : `The owner chose not to share any ${!payload?.permissions.viewPhotos ? "photos" : ""} ${!payload?.permissions.viewVideos ? "videos" : ""} in this link.`}
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {visible.map((m, i) => (
+            {filtered.map((m, i) => (
               <ShareTile
                 key={m.id}
                 media={m}
@@ -220,7 +285,7 @@ export function SharePage() {
 
       {viewerIndex != null && (
         <ShareViewer
-          items={visible}
+          items={filtered}
           startIndex={viewerIndex}
           canDownload={canDownload}
           onClose={() => setViewerIndex(null)}
@@ -229,7 +294,7 @@ export function SharePage() {
 
       {dlOpen && canDownload && (
         <DownloadDialog
-          targets={visible.map((m, i) => ({
+          targets={filtered.map((m, i) => ({
             media: m,
             which: m.hasImage ? "image" : "video",
             sortIndex: i,
@@ -246,6 +311,57 @@ export function SharePage() {
 // ---------------------------------------------------------------------------
 // Meta helpers
 // ---------------------------------------------------------------------------
+
+interface ShareSuggestion {
+  type: "category" | "keyword" | "person" | "subcategory";
+  label: string;
+  hint?: string;
+}
+
+/** Suggestions built only from the media actually shared in this token. */
+function suggestShared(media: MediaItem[], query: string): ShareSuggestion[] {
+  const q = query.trim().toLowerCase();
+  if (!q || media.length === 0) return [];
+
+  const catCount = new Map<string, number>();
+  const subCount = new Map<string, number>();
+  const personCount = new Map<string, number>();
+  const kwCount = new Map<string, number>();
+
+  for (const m of media) {
+    catCount.set(m.category, (catCount.get(m.category) ?? 0) + 1);
+    for (const s of m.subcategories) subCount.set(s, (subCount.get(s) ?? 0) + 1);
+    for (const p of m.people) personCount.set(p, (personCount.get(p) ?? 0) + 1);
+    for (const k of m.keywords) kwCount.set(k, (kwCount.get(k) ?? 0) + 1);
+  }
+
+  const out: ShareSuggestion[] = [];
+  const seen = new Set<string>();
+  const push = (type: ShareSuggestion["type"], label: string, count: number) => {
+    const key = `${type}:${label.toLowerCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ type, label, hint: `${count} ${count === 1 ? "memory" : "memories"}` });
+  };
+
+  for (const [name, count] of catCount) if (name.toLowerCase().includes(q)) push("category", name, count);
+  for (const [name, count] of subCount) if (name.toLowerCase().includes(q)) push("subcategory", name, count);
+  for (const [name, count] of personCount) if (name.toLowerCase().includes(q)) push("person", name, count);
+  for (const [name, count] of kwCount) if (name.toLowerCase().includes(q)) push("keyword", name, count);
+  for (const m of media) if (m.title.toLowerCase().includes(q)) push("keyword", m.title, 1);
+
+  return out.slice(0, 8);
+}
+
+function suggestionIcon(type: ShareSuggestion["type"]) {
+  switch (type) {
+    case "category": return <IconTags width={14} height={14} />;
+    case "subcategory": return <IconTags width={14} height={14} />;
+    case "person": return <IconUsers width={14} height={14} />;
+    case "keyword": return <IconStar width={14} height={14} />;
+    default: return <IconSearch width={14} height={14} />;
+  }
+}
 
 function applyMeta(property: string, content: string) {
   let el = document.head.querySelector<HTMLMetaElement>(`meta[property="${property}"]`);
@@ -282,10 +398,12 @@ function MessagePage({ title, message }: { title: string; message: string }) {
 
 function PasswordGate({
   name,
+  kind,
   expected,
   onUnlock,
 }: {
   name: string;
+  kind: string;
   expected: string;
   onUnlock: () => void;
 }) {
@@ -314,7 +432,7 @@ function PasswordGate({
         </span>
         <h1 className="font-display text-[22px] leading-tight text-ink">{name}</h1>
         <p className="mt-1 text-[13px] text-ink-2">
-          This collection is password protected. Enter the password to view it.
+          This {kind === "category" ? "category" : kind === "event" ? "event" : "collection"} is password protected. Enter the password to view it.
         </p>
         <label className="mt-5 block">
           <span className="mb-1.5 block text-[12px] font-medium text-ink-2">Password</span>

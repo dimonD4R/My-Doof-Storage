@@ -14,7 +14,7 @@ import {
 import { cn } from "../../utils/cn";
 
 interface Props {
-  kind: "collection" | "event";
+  kind: "collection" | "event" | "category";
   targetId: string;
   name: string;
   about: string;
@@ -235,7 +235,8 @@ const link = createShareLink({
         {view === "result" && result && (
           <div className="space-y-4">
             <p className="text-[13px] text-ink-2">
-              Anyone with this link can view the {kind === "collection" ? "collection" : "event"} you chose.
+              Anyone with this link can view the{" "}
+              {kind === "collection" ? "collection" : kind === "event" ? "event" : "category"} you chose.
             </p>
             <div className="flex gap-2">
               <input

@@ -85,7 +85,7 @@ interface AppStoreValue {
 
   shareLinks: ShareLink[];
   createShareLink: (input: {
-    kind: "collection" | "event";
+    kind: "collection" | "event" | "category";
     targetId: string;
     name: string;
     description: string;
@@ -387,7 +387,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   // ---- Sharing ------------------------------------------------------------
   const createShareLink = useCallback(
     (input: {
-      kind: "collection" | "event";
+      kind: "collection" | "event" | "category";
       targetId: string;
       name: string;
       description: string;
