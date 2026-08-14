@@ -15,7 +15,9 @@ export function applyFilters(
   let result = items;
   if (f.search.trim()) {
     const q = f.search.trim().toLowerCase();
-    result = result.filter((m) => matchesQuery(m, q));
+    const folderIndex = collectFolderIndex(items);
+    const keywordSet = collectKeywordSet(items);
+    result = result.filter((m) => matchesQuery(m, q, folderIndex, keywordSet));
   }
 
   if (f.years.length) result = result.filter((m) => m.date && f.years.includes(m.date.getFullYear()));
@@ -56,6 +58,35 @@ export function applyFilters(
 
 const searchBlobCache = new WeakMap<MediaItem, string>();
 
+/** Leaf folder (last directory) of a media path, e.g. "Mummy - Rahul". */
+function leafFolder(path: string): string {
+  const parts = path.split("/");
+  return parts.length > 1 ? parts[parts.length - 2] : "";
+}
+
+/** Index of every leaf folder name in the archive, for folder-scoped search. */
+function collectFolderIndex(items: MediaItem[]): string {
+  const names = new Set<string>();
+  for (const m of items) {
+    for (const p of [m.imagePath, m.videoPath]) {
+      const f = leafFolder(p);
+      if (f) names.add(f.toLowerCase());
+    }
+  }
+  return Array.from(names).join(" \u0000 ");
+}
+
+/** Set of every exact keyword in the archive, for exact keyword matching. */
+function collectKeywordSet(items: MediaItem[]): Set<string> {
+  const names = new Set<string>();
+  for (const m of items) {
+    for (const k of m.keywords) {
+      if (k) names.add(k.toLowerCase());
+    }
+  }
+  return names;
+}
+
 export function searchBlob(m: MediaItem): string {
   let blob = searchBlobCache.get(m);
   if (blob) return blob;
@@ -67,6 +98,8 @@ export function searchBlob(m: MediaItem): string {
     ...m.keywords,
     ...m.people,
     m.fileName,
+    leafFolder(m.imagePath),
+    leafFolder(m.videoPath),
     m.dateISO,
     m.date ? String(m.date.getFullYear()) : "",
   ];
@@ -75,10 +108,44 @@ export function searchBlob(m: MediaItem): string {
   return blob;
 }
 
-export function matchesQuery(m: MediaItem, queryLower: string): boolean {
+/**
+ * Search matcher. Priority per query token:
+ *  1. Exact keyword match – the token equals one of the item's keywords
+ *     (case-insensitive). Searching "rahul" only matches items whose keyword
+ *     is exactly "Rahul", never longer phrases like "Lalita Mummy Rahul".
+ *  2. Folder-scoped match – the token matches a folder name; the item is kept
+ *     only when its own folder contains that word.
+ *  3. Full-text fallback – substring match across all searchable fields.
+ * Multiple words must all match (AND).
+ *
+ * Examples:
+ *   "rahul"            -> only items with the exact keyword "Rahul"
+ *   "rahul lalita"     -> items that have both exact keywords "Rahul" and "Lalita"
+ *   "rahul mummy lalita" -> items that have all three exact keywords
+ */
+export function matchesQuery(
+  m: MediaItem,
+  queryLower: string,
+  folderIndex: string,
+  keywordSet: Set<string>
+): boolean {
+  const q = queryLower.trim().toLowerCase();
+  if (!q) return true;
+  const kw = new Set(m.keywords.map((k) => k.toLowerCase()));
+  // Whole query is itself an exact keyword (e.g. "animal video", "lalita video").
+  if (keywordSet.has(q)) return kw.has(q);
+  const tokens = q.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const leaf = [leafFolder(m.imagePath), leafFolder(m.videoPath)]
+    .filter(Boolean)
+    .join(" \u0000 ")
+    .toLowerCase();
   const blob = searchBlob(m);
-  const tokens = queryLower.trim().split(/\s+/).filter(Boolean);
-  return tokens.every((t) => blob.includes(t));
+  return tokens.every((t) => {
+    if (keywordSet.has(t)) return kw.has(t);
+    if (folderIndex.includes(t)) return leaf.includes(t);
+    return blob.includes(t);
+  });
 }
 
 export function sortMedia(items: MediaItem[], key: SortKey): MediaItem[] {
