@@ -77,7 +77,11 @@ export function SearchBar({
     setOpen(false);
     if (!trimmed) return;
     onNavigate?.();
-    navigate(`/memories?search=${encodeURIComponent(trimmed)}`);
+    // Preserve any active URL filters (e.g. a category, event, collection) so a
+    // search stays scoped to the current view instead of resetting it.
+    const params = new URLSearchParams(location.search);
+    params.set("search", trimmed);
+    navigate(`/memories?${params.toString()}`);
   };
 
   const onSubmit = (e: FormEvent) => {
