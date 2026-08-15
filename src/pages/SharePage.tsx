@@ -6,7 +6,7 @@ import { EMPTY_FILTERS } from "../types";
 import { useApp } from "../state/AppStore";
 import { decodePayloadIds, decodeToken, sha256Hex } from "../lib/sharing";
 import { applyFilters } from "../lib/filtering";
-import { mediaUrl, mediaUrls } from "../data/mediaUrlResolver";
+import { mediaUrl, mediaUrls, thumbUrl } from "../data/mediaUrlResolver";
 import { startDownload } from "../lib/downloads";
 import { DownloadDialog } from "../components/downloads/DownloadDialog";
 import { plural } from "../utils/date";
@@ -281,6 +281,7 @@ export function SharePage() {
                 key={m.id}
                 media={m}
                 configUrl={(path) => mediaUrl(config, path)}
+                thumbOf={(path) => thumbUrl(config, path)}
                 canDownload={canDownload}
                 index={i}
                 onOpen={() => openViewer(i)}
@@ -489,17 +490,20 @@ function PasswordGate({
 function ShareTile({
   media,
   configUrl,
+  thumbOf,
   canDownload,
   index,
   onOpen,
 }: {
   media: MediaItem;
   configUrl: (path: string) => string;
+  thumbOf: (path: string) => string;
   canDownload: boolean;
   index: number;
   onOpen: () => void;
 }) {
   const [broken, setBroken] = useState(false);
+  const [useFull, setUseFull] = useState(false);
   const [duration, setDuration] = useState<number | null>(null);
 
   return (
@@ -511,11 +515,14 @@ function ShareTile({
       >
         {media.hasImage && !broken ? (
           <img
-            src={configUrl(media.imagePath)}
+            src={useFull ? configUrl(media.imagePath) : thumbOf(media.imagePath)}
             alt={media.title}
             loading="lazy"
             decoding="async"
-            onError={() => setBroken(true)}
+            onError={() => {
+              if (!useFull) setUseFull(true);
+              else setBroken(true);
+            }}
             className="h-full w-full object-cover"
           />
         ) : media.hasVideo && !broken ? (
